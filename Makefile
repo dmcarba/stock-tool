@@ -38,6 +38,11 @@ publish: ## publish a release to pypi.
 	@echo "🚀 Publishing."
 	@poetry publish
 
+.PHONY: docker
+docker: ## create docker image.
+	@echo "🚀 Building Docker image: stock-tool"
+	@docker build -t stock-tool .
+
 .PHONY: build-and-publish
 build-and-publish: build publish ## Build and publish.
 

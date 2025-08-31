@@ -7,18 +7,25 @@ class StockExtractionService:
     """Service for extracting stock data from Yahoo Finance."""
     
     sectors = [
-    "basic materials",
-    "communication services",
-    "consumer cyclical",
-    "consumer defensive",
-    "energy",
-    "financial services",
-    "healthcare",
-    "industrials",
-    "real estate",
-    "technology",
-    "utilities"
+        "basic materials",
+        "communication services",
+        "consumer cyclical",
+        "consumer defensive",
+        "energy",
+        "financial services",
+        "healthcare",
+        "industrials",
+        "real estate",
+        "technology",
+        "utilities"
     ]
+
+    # Configure logging to send INFO logs to stdout
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=[logging.StreamHandler()]
+    )
     
     def __init__(self) -> None:
         self.logger = logging.getLogger(__name__)

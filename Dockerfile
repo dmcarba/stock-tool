@@ -1,5 +1,5 @@
 # -------- Builder --------
-FROM python:3.11-alpine as builder
+FROM python:3.11-alpine AS builder
 
 RUN apk add --no-cache build-base gcc musl-dev libffi-dev
 
