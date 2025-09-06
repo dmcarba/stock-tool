@@ -18,6 +18,7 @@ pandas = "*"
 yfinance = "*"
 mcp = "*"
 fastmcp = "*"
+lxml = "*"
 
 
 [tool.poetry.group.dev.dependencies]

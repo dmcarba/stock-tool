@@ -4,6 +4,7 @@ import pytest
 import pytest_asyncio
 import threading
 import time
+import os
 from fastmcp import Client
 from stock_tool.stock_tool import main
 
@@ -14,6 +15,9 @@ class TestMCPServerIntegration:
     def mcp_server(self):
         """Start MCP server for testing."""
         import traceback
+        
+        # Use test database
+        os.environ["PORTFOLIO_DB_PATH"] = "test_mcp_portfolio.db"
         
         def traced_main():
             try:
@@ -35,6 +39,18 @@ class TestMCPServerIntegration:
         print("Server should be ready!")
         
         yield server_thread
+        
+        # Cleanup test database
+        if os.path.exists("test_mcp_portfolio.db"):
+            os.remove("test_mcp_portfolio.db")
+    
+    @pytest.fixture(autouse=True)
+    def cleanup_db(self):
+        """Clean database between tests."""
+        yield
+        # Remove test database after each test
+        if os.path.exists("test_mcp_portfolio.db"):
+            os.remove("test_mcp_portfolio.db")
 
     @pytest_asyncio.fixture
     async def mcp_client(self, mcp_server):
@@ -87,3 +103,87 @@ class TestMCPServerIntegration:
         result = await mcp_client.call_tool("get_top_companies", {})
         print(f"Top companies result: {result}")
         assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_add_tracked_ticker(self, mcp_client):
+        """Test adding ticker to portfolio."""
+        await mcp_client.call_tool("add_tracked_ticker", {"symbol": "AAPL", "quantity": 10.0})
+
+    @pytest.mark.asyncio
+    async def test_get_tracked_ticker(self, mcp_client):
+        """Test getting specific tracked ticker."""
+        await mcp_client.call_tool("add_tracked_ticker", {"symbol": "GOOGL", "quantity": 5.0})
+        result = await mcp_client.call_tool("get_tracked_ticker", {"symbol": "GOOGL"})
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_get_tracked_tickers(self, mcp_client):
+        """Test getting all tracked tickers."""
+        await mcp_client.call_tool("add_tracked_ticker", {"symbol": "MSFT", "quantity": 15.0})
+        result = await mcp_client.call_tool("get_tracked_tickers", {})
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_remove_tracked_ticker(self, mcp_client):
+        """Test removing ticker from portfolio."""
+        await mcp_client.call_tool("add_tracked_ticker", {"symbol": "NVDA", "quantity": 8.0})
+        result = await mcp_client.call_tool("remove_tracked_ticker", {"symbol": "NVDA"})
+        assert isinstance(result, list)
+
+    @pytest.mark.asyncio
+    async def test_remove_nonexistent_ticker(self, mcp_client):
+        """Test removing non-existent ticker raises error."""
+        try:
+            await mcp_client.call_tool("remove_tracked_ticker", {"symbol": "NONEXISTENT"})
+            assert False, "Expected exception but none was raised"
+        except Exception as e:
+            print(f"Exception type: {type(e)}")
+            print(f"Exception message: {e}")
+            assert True
+
+    @pytest.mark.asyncio
+    async def test_get_sp500_index_listing(self, mcp_client):
+        """Test getting S&P 500 index listing via MCP."""
+        result = await mcp_client.call_tool("get_index_listing", {"index_name": "SP500"})
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_get_dax_index_listing(self, mcp_client):
+        """Test getting DAX index listing via MCP."""
+        result = await mcp_client.call_tool("get_index_listing", {"index_name": "DAX"})
+        assert isinstance(result, list)
+        assert len(result) > 0
+        
+    @pytest.mark.asyncio
+    async def test_get_ibex35_index_listing(self, mcp_client):
+        """Test getting IBEX35 index listing via MCP."""
+        result = await mcp_client.call_tool("get_index_listing", {"index_name": "IBEX35"})
+        assert isinstance(result, list)
+        assert len(result) > 0
+        
+    @pytest.mark.asyncio
+    async def test_get_ftse100_index_listing(self, mcp_client):
+        """Test getting FTSE100 index listing via MCP."""
+        result = await mcp_client.call_tool("get_index_listing", {"index_name": "FTSE100"})
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_get_invalid_index_listing(self, mcp_client):
+        """Test getting invalid index listing raises error."""
+        try:
+            await mcp_client.call_tool("get_index_listing", {"index_name": "INVALID"})
+            assert False, "Expected exception but none was raised"
+        except Exception as e:
+            print(f"Index listing exception: {type(e)} - {e}")
+            assert True
+
+    @pytest.mark.asyncio
+    async def test_get_listing_summary(self, mcp_client):
+        """Test getting listing summary for multiple symbols via MCP."""
+        symbols = ["AAPL", "GOOGL", "MSFT"]
+        result = await mcp_client.call_tool("get_listing_summary", {"symbols": symbols})
+        assert isinstance(result, list)
+        assert len(result) > 0

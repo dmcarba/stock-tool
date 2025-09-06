@@ -24,6 +24,7 @@ class StockExtractionRouter:
         self.router.get("/top-companies", responses={404: {"description": "No top companies found"}})(self.extract_top_companies)
         self.router.get("/top-etfs", responses={404: {"description": "No top ETFs found"}})(self.extract_top_etfs)
         self.router.get("/top-funds", responses={404: {"description": "No top funds found"}})(self.extract_top_funds)
+        self.router.post("/listing-summary")(self.extract_listing_summary)
     
     def extract_ticker_info(self, symbol: str):
         try:
@@ -114,6 +115,13 @@ class StockExtractionRouter:
             return self.service.extract_top_funds()
         except ValueError as e:
             self.logger.error(f"ValueError in extract_top_funds: {e}")
+            raise HTTPException(status_code=404, detail=str(e))
+    
+    def extract_listing_summary(self, symbols: list[str]):
+        try:
+            return self.service.extract_listing_summary(symbols)
+        except ValueError as e:
+            self.logger.error(f"ValueError in extract_listing_summary: {e}")
             raise HTTPException(status_code=404, detail=str(e))
 
 router = StockExtractionRouter().router

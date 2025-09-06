@@ -2,12 +2,16 @@
 
 from typing import Dict, List, Any
 from .services.stock_extraction_service import StockExtractionService
+from .services.portfolio_service import PortfolioService
+from .services.index_listing_service import IndexListingService
 from mcp.server.fastmcp import FastMCP
 import os
 
 mcp_port = int(os.environ.get("MCP_PORT", 3001))
 mcp = FastMCP("Stock tool MCP Server", log_level="ERROR", port=mcp_port, stateless_http=True, host="0.0.0.0")
 service = StockExtractionService()
+portfolio_service = PortfolioService()
+index_service = IndexListingService()
 
 def start_mcp_server():
     """Start the MCP server."""
@@ -78,3 +82,36 @@ def get_top_etfs() -> Dict[str, Any]:
 def get_top_funds() -> Dict[str, Any]:
     """Get top mutual funds by sector."""
     return service.extract_top_funds()
+
+@mcp.tool(description="Get all tracked tickers in portfolio")
+def get_tracked_tickers() -> List[Dict[str, Any]]:
+    """Get all tracked tickers."""
+    tickers = portfolio_service.get_all_tracked_tickers()
+    return [ticker.model_dump() for ticker in tickers]
+
+@mcp.tool(description="Get specific portfolio tracked ticker by symbol")
+def get_tracked_ticker(symbol: str) -> Dict[str, Any]:
+    """Get tracked ticker by symbol."""
+    ticker = portfolio_service.get_tracked_ticker(symbol)
+    return ticker.model_dump()
+
+@mcp.tool(description="Add ticker to portfolio tracking")
+def add_tracked_ticker(symbol: str, quantity: float):
+    """Add ticker to portfolio."""
+    portfolio_service.add_ticker(symbol, quantity)
+
+@mcp.tool(description="Remove ticker from portfolio tracking")
+def remove_tracked_ticker(symbol: str):
+    """Remove ticker from portfolio."""
+    portfolio_service.remove_ticker(symbol)
+
+@mcp.tool(description="Get stock symbols for a specific market index (SP500, IBEX35, FTSE100, DAX)")
+def get_index_listing(index_name: str) -> List[str]:
+    """Get stock symbols for a market index."""
+    return index_service.get_index_listing(index_name)
+
+@mcp.tool(description="Get comprehensive summary data for multiple stock symbols including current price, PE ratios, EPS, growth metrics, financial ratios, debt metrics, dividend information, analyst targets and recommendations")
+def get_listing_summary(symbols: List[str]) -> List[Dict[str, Any]]:
+    """Get listing summary for multiple symbols."""
+    results = service.extract_listing_summary(symbols)
+    return [result.model_dump() for result in results]

@@ -240,3 +240,15 @@ def test_get_top_funds(client):
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)
+
+
+def test_extract_listing_summary(client):
+    """Test extract listing summary endpoint"""
+    symbols = ["AAPL", "GOOGL", "MSFT"]
+    response = client.post("/stock/listing-summary", json=symbols)
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) > 0
+    assert "symbol" in data[0]

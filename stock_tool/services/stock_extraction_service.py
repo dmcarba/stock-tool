@@ -1,7 +1,11 @@
 import yfinance as yf
 import pandas as pd
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
+from ..models.models import TickerSummary
+import asyncio
+import concurrent.futures
+
 
 class StockExtractionService:
     """Service for extracting stock data from Yahoo Finance."""
@@ -209,6 +213,12 @@ class StockExtractionService:
                 result[s] = sector  # Store funds by sector key
         return result
     
+    def extract_listing_summary(self, symbols: List[str]) -> List[TickerSummary]:        
+        # Always run in separate thread to avoid event loop conflicts
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, self._populate_tickers_summary(symbols))
+            return future.result()
+    
     def _getTicker(self, symbol: str) -> yf.Ticker:
         """Get Yahoo Finance ticker object with validation.
         
@@ -237,3 +247,72 @@ class StockExtractionService:
             for col, val in row.items()}
             for row in df.to_dict(orient="records")
         ]
+        
+    async def _populate_tickers_summary(self, symbols: List[str]) -> List[TickerSummary]:
+        tasks = [self._fetch_ticker_data(symbol) for symbol in symbols]
+        results = await asyncio.gather(*tasks)
+        return [r for r in results if r is not None]
+
+
+    async def _fetch_ticker_data(self, symbol: str) -> Optional[TickerSummary]:
+        try:
+            ticker = yf.Ticker(symbol)
+            info = await asyncio.to_thread(lambda: ticker.info)
+            if not info or "regularMarketPrice" not in info:
+                print(f"⚠️ Symbol {symbol} not found or has no market data, skipping.")
+                return None
+
+            eps_trailing = info.get("trailingEps")
+            eps_forward = info.get("forwardEps")
+            earnings_growth = None
+            if eps_trailing and eps_forward:
+                try:
+                    earnings_growth = (eps_forward - eps_trailing) / abs(eps_trailing)
+                except ZeroDivisionError:
+                    earnings_growth = None
+
+            rec_df = await asyncio.to_thread(lambda: ticker.recommendations)
+            recommendation_breakdown = None
+            if rec_df is not None and not rec_df.empty:
+                recent_row = rec_df.head(1).iloc[0]
+                recommendation_breakdown = {
+                    'strongBuy': int(recent_row.get('strongBuy', 0)),
+                    'buy': int(recent_row.get('buy', 0)),
+                    'hold': int(recent_row.get('hold', 0)),
+                    'sell': int(recent_row.get('sell', 0)),
+                    'strongSell': int(recent_row.get('strongSell', 0)),
+                }
+
+            ts = TickerSummary(
+                symbol=symbol,
+                name=info.get("shortName") or info.get("longName"),
+                currentPrice=info.get("currentPrice"),
+                trailingPE=info.get("trailingPE"),
+                forwardPE=info.get("forwardPE"),
+                priceToBook=info.get("priceToBook"),
+                enterpriseToEbitda=info.get("enterpriseToEbitda"),
+                epsTrailingTwelveMonths=info.get("trailingEps"),
+                epsForward=eps_forward,
+                revenueGrowth=info.get("revenueGrowth"),
+                earningsGrowth=earnings_growth,
+                returnOnEquity=info.get("returnOnEquity"),
+                profitMargins=info.get("profitMargins"),
+                freeCashflow=info.get("freeCashflow"),
+                totalDebt=info.get("totalDebt"),
+                totalCash=info.get("totalCash"),
+                debtToEquity=info.get("debtToEquity"),
+                dividendRate=info.get("dividendRate"),
+                dividendYield=info.get("dividendYield"),
+                payoutRatio=info.get("payoutRatio"),
+                dividendGrowth5Y=info.get("fiveYearAvgDividendYield"),
+                targetMeanPrice=info.get("targetMeanPrice"),
+                recommendationKey=info.get("recommendationKey"),
+                recommendationMean=info.get("recommendationMean"),
+                averageAnalystRating=info.get("averageAnalystRating"),
+                recommendationBreakdown=recommendation_breakdown
+            )
+            return ts
+
+        except Exception as e:
+            print(f"⚠️ Error fetching {symbol}: {e}")
+            return None
